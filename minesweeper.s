@@ -171,33 +171,33 @@ reveal_grid__body:
         # replaced s1 with t6
         # ^ in order to not use s registers
         # PUT YOUR CODE FOR reveal_grid HERE
-        li      $t5, 0          # int i = 0;
-                                #
+        li      $t5, 0                  # int i = 0;
+                                        #
 reveal_grid__body_loop_1:
         bge     $t5, N_ROWS, reveal_grid__epilogue     # while(i < n_rows)
-        li      $t6, 0          # int j = 0;
-                                #
+        li      $t6, 0                  # int j = 0;
+                                        #
 reveal_grid__body_loop_2:       
         bge     $t6, N_COLS, reveal_grid__body_loop2_end        # while (j < n_cols)
-                                #
-        la      $t0, grid       # t0 = &grid
-                                #
+                                        #
+        la      $t0, grid               # t0 = &grid
+                                        #       
         mul     $t1, $t5, N_COLS        # y_array_position( t1 ) = (n_cols * i)
-        add     $t2, $t6, $t1   # x_y_position (t2) = (t6 + t1)
-        add     $t3, $t2, $t0   # x_y_in_grid ( t3 ) = (grid + t2)
-                                #
-        lb      $t4, 0($t3)     # $t4 = grid[row][col]
-                                #
-        ori     $t4, $t4, IS_RVLD_MASK
-        sb      $t4, 0($t3)     #
-                                #
-                                #
-        addi    $t6, $t6, 1     # j++
+        add     $t2, $t6, $t1           # x_y_position (t2) = (t6 + t1)
+        add     $t3, $t2, $t0           # x_y_in_grid ( t3 ) = (grid + t2)
+                                        #
+        lb      $t4, 0($t3)             # $t4 = grid[row][col]
+                                        #
+        ori     $t4, $t4, IS_RVLD_MASK  #
+        sb      $t4, 0($t3)             #
+                                        #
+                                        #
+        addi    $t6, $t6, 1             # j++
         j       reveal_grid__body_loop_2
-                                #
+                                        #
 reveal_grid__body_loop2_end:
-                                #
-        addi    $t5, $t5, 1     # i++
+                                        #
+        addi    $t5, $t5, 1             # i++
         j       reveal_grid__body_loop_1
 
 reveal_grid__epilogue:
@@ -335,6 +335,63 @@ mark_cell__body:
         # }
 
         # PUT YOUR CODE FOR mark_cell HERE
+
+
+        # calculating x,y from the array pointer.
+
+        la      $t0, grid               # t0 = &grid
+        
+        mul     $t1, $a0, N_COLS        # y_array_position( t1 ) = (n_cols * int rows)
+        add     $t2, $a1, $t1           # x_y_position (t2) = (int col + $t1)
+        add     $t3, $t2, $t0           # x_y_in_grid ( t3 ) = (grid + t2)
+                                        #
+        lb      $t4, 0($t3)             # $t4 = grid[row][col]
+
+        # if (grid[row][col] & IS_RVLD_MASK) goto:
+
+        andi    $t5, $t4, IS_RVLD_MASK  # 
+        beq     $t5, IS_RVLD_MASK, mark_cell__body_rvld_branch  #
+
+        andi    $t6, $t4, IS_MRKD_MASK  # 
+        beq     $t6, IS_MRKD_MASK, mark_cell__body_rvld_branch_2  #
+
+        ori     $t4, $t4, IS_MRKD_MASK  #
+        sb      $t4, 0($t3)             #
+
+        lw      $t9, bomb_count
+        sub     $t9, $t9, 1
+        sw      $t9, bomb_count         # bomb_count--;
+
+
+        j       mark_cell__epilogue
+
+
+
+mark_cell__body_rvld_branch:
+        lw      $t0, debug_mode         #
+        li      $t1, TRUE
+        beq     $t1, $t0, mark_cell__epilogue
+                                        #
+        la      $a0, mark_error         # printf("Cannot mark a revealed cell.\n");
+        li      $v0, 4                  #
+        syscall                         #
+
+        j       mark_cell__epilogue
+
+mark_cell__body_rvld_branch_2:
+
+
+        li      $t6, IS_MRKD_MASK
+        not     $t7, $t6      # $t7 = ~is_mrkd_mask;
+        and     $t4, $t7, $t4           #        
+
+        sb      $t4, 0($t3)             # grid[row][col] |= IS_MRKD_MASK;
+
+        lw      $t9, bomb_count
+        add     $t9, $t9, 1
+        sw      $t9, bomb_count         # bomb_count++;
+
+        j       mark_cell__epilogue 
 
 
 mark_cell__epilogue:
