@@ -167,21 +167,23 @@ reveal_grid__body:
         #     }
         #   }
         # }
-
+        # replaced s0 with t5
+        # replaced s1 with t6
+        # ^ in order to not use s registers
         # PUT YOUR CODE FOR reveal_grid HERE
-        li      $s0, 0          # int i = 0;
+        li      $t5, 0          # int i = 0;
                                 #
 reveal_grid__body_loop_1:
-        bge     $s0, N_ROWS, reveal_grid__epilogue     # while(i < n_rows)
-        li      $s1, 0          # int j = 0;
+        bge     $t5, N_ROWS, reveal_grid__epilogue     # while(i < n_rows)
+        li      $t6, 0          # int j = 0;
                                 #
 reveal_grid__body_loop_2:       
-        bge     $s1, N_COLS, reveal_grid__body_loop2_end        # while (j < n_cols)
+        bge     $t6, N_COLS, reveal_grid__body_loop2_end        # while (j < n_cols)
                                 #
         la      $t0, grid       # t0 = &grid
                                 #
-        mul     $t1, $s0, N_COLS        # y_array_position( t1 ) = (n_cols * i)
-        add     $t2, $s1, $t1   # x_y_position (t2) = (s1 + t1)
+        mul     $t1, $t5, N_COLS        # y_array_position( t1 ) = (n_cols * i)
+        add     $t2, $t6, $t1   # x_y_position (t2) = (t6 + t1)
         add     $t3, $t2, $t0   # x_y_in_grid ( t3 ) = (grid + t2)
                                 #
         lb      $t4, 0($t3)     # $t4 = grid[row][col]
@@ -190,12 +192,12 @@ reveal_grid__body_loop_2:
         sb      $t4, 0($t3)     #
                                 #
                                 #
-        addi    $s1, $s1, 1     # j++
-        j reveal_grid__body_loop_2
+        addi    $t6, $t6, 1     # j++
+        j       reveal_grid__body_loop_2
                                 #
 reveal_grid__body_loop2_end:
                                 #
-        addi    $s0, $s0, 1     # i++
+        addi    $t5, $t5, 1     # i++
         j       reveal_grid__body_loop_1
 
 reveal_grid__epilogue:
@@ -217,8 +219,8 @@ place_bombs:
         # Returns: void
         #
         # Frame:    $ra, [...]
-        # Uses:     [...]
-        # Clobbers: [...]
+        # Uses:     [$s0]
+        # Clobbers: [$a0, $t0, $t1]
         #
         # Locals:
         #   - [...]
@@ -245,6 +247,34 @@ place_bombs__body:
 
         # PUT YOUR CODE FOR place_bombs HERE
 
+        # Clobbers for place_single_bomb: $a0, $t0, $t1
+        addi    $sp, $sp, -4    # move stack pointer down to make room for s0
+        sw      $s0, 0($sp)
+        li      $s0, 0          # int i = 0;
+
+place_bombs__body_loop:
+        lw      $t0, total_bombs
+        bge     $s0, $t0, place_bombs__body_end
+
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        jal     place_single_bomb
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        addi    $s0, $s0, 1     # i++;
+
+        j       place_bombs__body_loop
+
+place_bombs__body_end:
+        lw      $s0, 0($sp)
+        addi    $sp, $sp, 4   # move stack pointer down to make room for a0,a1,ra
 
 place_bombs__epilogue:
         lw      $ra, 0($sp)
