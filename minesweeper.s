@@ -380,12 +380,11 @@ mark_cell__body_rvld_branch:
 
 mark_cell__body_rvld_branch_2:
 
-
         li      $t6, IS_MRKD_MASK
-        not     $t7, $t6      # $t7 = ~is_mrkd_mask;
+        not     $t7, $t6                # $t7 = ~is_mrkd_mask;
         and     $t4, $t7, $t4           #        
 
-        sb      $t4, 0($t3)             # grid[row][col] |= IS_MRKD_MASK;
+        sb      $t4, 0($t3)             # grid[row][col] &= ~IS_MRKD_MASK;
 
         lw      $t9, bomb_count
         add     $t9, $t9, 1
@@ -471,6 +470,108 @@ reveal_cell__body:
 
         # PUT YOUR CODE FOR reveal_cell HERE
 
+        la      $t0, grid                       # t0 = &grid
+        
+        mul     $t1, $a0, N_COLS                # y_array_position( t1 ) = (n_cols * int rows)
+        add     $t2, $a1, $t1                   # x_y_position (t2) = (int col + $t1)
+        add     $t3, $t2, $t0                   # x_y_in_grid ( t3 ) = (grid + t2)
+                                                #
+        lb      $t4, 0($t3)                     # $t4 = grid[row][col]
+
+        #   // Trigger game over if the cell is a bomb.
+        andi    $t5, $t4, IS_BOMB_MASK          # 
+        beq     $t5, IS_BOMB_MASK, reveal_cell__body_if_1  # if (grid[row][col] & is_bomb_mask)
+
+
+        #   // Cannot reveal a cell that is currently marked.
+        andi    $t5, $t4, IS_MRKD_MASK          # 
+        beq     $t5, IS_MRKD_MASK, reveal_cell__body_if_2  # if (grid[row][col] & is_bomb_mask)
+
+
+        andi    $t5, $t4, IS_RVLD_MASK          # 
+        beq     $t5, IS_RVLD_MASK, reveal_cell__body_if_3  # if (grid[row][col] & IS_RVLD_MASK) 
+
+        j       reveal_cell__body_end
+
+
+reveal_cell__body_if_1:                 # game_state = lose
+        li      $t1, LOSE               #
+        sw      $t1, game_state         # game_state = PLAYING;
+
+        j       reveal_cell__body_end
+
+
+reveal_cell__body_if_2:                 # Cannot reveal a cell that is currently marked.
+        lw      $t0, debug_mode         #
+        li      $t1, TRUE
+        beq     $t1, $t0, reveal_cell__epilogue # return
+
+                                        #
+        la      $a0, reveal_error       # printf("Cannot reveal a marked cell.\n");
+        li      $v0, 4                  #
+        syscall                         #
+
+        j       reveal_cell__epilogue
+
+
+reveal_cell__body_if_3:                 # if (grid[row][col] & IS_RVLD_MASK) 
+        lw      $t0, debug_mode         #
+        li      $t1, TRUE
+        beq     $t1, $t0, reveal_cell__epilogue # return
+                                        #
+        la      $a0, already_revealed   # printf("Cell is already revealed.\n");
+        li      $v0, 4                  #
+        syscall                         #
+
+        j       reveal_cell__epilogue
+
+reveal_cell__body_if_4:                 # 
+        addiu   $sp, $sp, -4
+        sw      $ra, 0($sp)
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)
+        addiu   $sp, $sp, 4        
+
+        j       reveal_cell__body_end_2
+
+reveal_cell__body_end:                 # if (game_state != LOSE) {
+
+        # if ((grid[row][col] & VALUE_MASK) == 0) {
+        andi    $t5, $t4, IS_RVLD_MASK 
+        beqz     $t5, reveal_cell__body_if_4     #
+
+
+        # grid[row][col] |= IS_RVLD_MASK;
+
+        ori     $t4, $t4, IS_RVLD_MASK
+        sb      $t4, 0($t3) 
+
+        lw      $t7, game_state
+        li      $t8, LOSE
+        beq     $t8, $t7, reveal_cell__body_end_2
+
+        #   cells_left--;
+        lw      $t8, cells_left
+        sub     $t8, $t8, 1
+
+        sw      $t8, cells_left
+
+        j       reveal_cell__body_end_2
+
+reveal_cell__body_end_2:
+
+        lw      $t8, cells_left
+
+        beqz    $t8, reveal_cell__body_end_3     #
+
+        j       reveal_cell__epilogue
+
+reveal_cell__body_end_3:        # game_state = WIN
+
+        li      $t7, WIN
+        sw      $t7, game_state
 
 reveal_cell__epilogue:
         lw      $ra, 0($sp)
@@ -541,7 +642,186 @@ clear_surroundings__body:
         #   clear_surroundings(row + 1, col + 1);
         # }
 
-        # PUT YOUR CODE FOR clear_surroundings HERE
+        # if (row < 0 || row >= N_ROWS || col < 0 || col >= N_COLS) {return}
+        
+        bltz    $a0, clear_surroundings__epilogue       # row < 0
+        li      $t0, N_ROWS                             #
+        bge     $a0, $t0, clear_surroundings__epilogue  # row >= N_ROWS
+
+        bltz    $a1, clear_surroundings__epilogue       # col < 0
+        li      $t0, N_COLS                             #
+        bge     $a0, $t0, clear_surroundings__epilogue  # col >= N_COLS
+
+        #<<<<<<<<<<<<<<<<<<<<<
+        # getting grid[row][col]
+        la      $t0, grid                       # t0 = &grid
+        
+        mul     $t1, $a0, N_COLS                # y_array_position( t1 ) = (n_cols * int rows)
+        add     $t2, $a1, $t1                   # x_y_position (t2) = (int col + $t1)
+        add     $t3, $t2, $t0                   # x_y_in_grid ( t3 ) = (grid + t2)
+                                                #
+        lb      $t4, 0($t3)                     # $t4 = grid[row][col]
+        #>>>>>>>>>>>>>>>>>>>>>>> added in to test 
+
+        # if (grid[row][col] & IS_RVLD_MASK) {return}
+        andi    $t5, $t4, IS_RVLD_MASK          # 
+        beq     $t5, IS_RVLD_MASK, clear_surroundings__epilogue  #
+
+
+        # grid[row][col] |= IS_RVLD_MASK;
+        ori     $t5, $t4, IS_RVLD_MASK
+        sb      $t5, 0($t3)
+
+        #   cells_left--;
+        lw      $t8, cells_left
+        sub     $t8, $t8, 1
+        sw      $t8, cells_left
+
+        
+
+        #// Unmark the cell if it was marked.
+        #   grid[row][col] &= ~IS_MRKD_MASK;
+        li      $t6, IS_MRKD_MASK
+        not     $t7, $t6                        # $t7 = ~is_mrkd_mask;
+        and     $t5, $t7, $t4                   #        
+
+        sb      $t5, 0($t3)                     # grid[row][col] &= ~IS_MRKD_MASK;
+
+
+        # // Stop revealing once a numbered cell is reached.
+        #   if (grid[row][col] & VALUE_MASK) {
+
+        andi    $t5, $t4, VALUE_MASK                          # 
+        beq     $t5, VALUE_MASK, clear_surroundings__epilogue #
+
+
+        # // Recurse to the surrounding cells in the grid.
+        #   clear_surroundings(row - 1, col);
+
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi    $a0, $a0, -1   
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+
+        # clear_surroundings(row - 1, col - 1)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi     $a0, $a0, -1   
+        addi     $a1, $a1, -1
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        # clear_surroundings(row - 1, col + 1)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi     $a0, $a0, -1   
+        addi     $a1, $a1, 1
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        # clear_surroundings(row, col - 1)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi    $a1, $a1, -1
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        # clear_surroundings(row, col + 1)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi    $a1, $a1, 1
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        # clear_surroundings(row + 1, col - 1)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi    $a0, $a0, 1   
+        addi    $a1, $a1, -1
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        # clear_surroundings(row + 1, col)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi    $a0, $a0, 1   
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+        # clear_surroundings(row + 1, col + 1)
+        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
+        sw      $ra, 0($sp)     # save $ra on $stack
+        sw      $a0, 4($sp)     # save a1 and a0 on stack
+        sw      $a1, 8($sp)     #
+
+        addi    $a0, $a0, 1   
+        addi    $a1, $a1, 1
+
+        jal     clear_surroundings
+
+        lw      $ra, 0($sp)     # restore $ra on $stack
+        lw      $a0, 4($sp)     # restore a1 and a0 on stack
+        lw      $a1, 8($sp)     #
+        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
+
+
 
 clear_surroundings__epilogue:
         lw      $ra, 0($sp)
