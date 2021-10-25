@@ -496,7 +496,7 @@ reveal_cell__body:
 
 reveal_cell__body_if_1:                 # game_state = lose
         li      $t1, LOSE               #
-        sw      $t1, game_state         # game_state = PLAYING;
+        sw      $t1, game_state         # game_state = LOSE;
 
         j       reveal_cell__body_end
 
@@ -539,28 +539,28 @@ reveal_cell__body_if_4:                 #
 reveal_cell__body_end:                 # if (game_state != LOSE) {
 
         # if ((grid[row][col] & VALUE_MASK) == 0) {
-        andi    $t5, $t4, IS_RVLD_MASK 
+        andi    $t5, $t4, VALUE_MASK 
         beqz     $t5, reveal_cell__body_if_4     #
 
 
-        # grid[row][col] |= IS_RVLD_MASK;
+        # grid[row][col] |= IS_RVLD_MASK
 
         ori     $t4, $t4, IS_RVLD_MASK
         sb      $t4, 0($t3) 
 
-        lw      $t7, game_state
-        li      $t8, LOSE
-        beq     $t8, $t7, reveal_cell__body_end_2
+
+        lw      $t7, game_state         #  if (game_state == LOSE) 
+        beq     $t7, LOSE, reveal_cell__body_end_2
+
 
         #   cells_left--;
         lw      $t8, cells_left
         sub     $t8, $t8, 1
-
         sw      $t8, cells_left
 
         j       reveal_cell__body_end_2
 
-reveal_cell__body_end_2:
+reveal_cell__body_end_2:        #if (cells_left == 0) {game_state = WIN;}
 
         lw      $t8, cells_left
 
@@ -674,11 +674,19 @@ clear_surroundings__body:
 
         # if (grid[row][col] & IS_RVLD_MASK) {return}
         andi    $t5, $s2, IS_RVLD_MASK          # 
-        bge     $t5, IS_RVLD_MASK, clear_surroundings__epilogue  #
+        beq     $t5, IS_RVLD_MASK, clear_surroundings__epilogue  #
 
         # grid[row][col] |= IS_RVLD_MASK;
         ori     $t5, $s2, IS_RVLD_MASK
-        sb      $t5, 0($s3)
+        sb      $t5, 0($s3)        
+
+        #   cells_left--;                               sub needs a register instead of an 1nt; tests worked 
+        # when i didnt do this so i dont know what to do
+
+        lw      $t8, cells_left
+        li      $t0, 1
+        sub     $t8, $t8, $t0
+        sw      $t8, cells_left
 
 
         #// Unmark the cell if it was marked.
@@ -688,17 +696,6 @@ clear_surroundings__body:
         and     $t5, $t7, $t5                   #        
 
         sb      $t5, 0($s3)                     # grid[row][col] &= ~IS_MRKD_MASK;
-
-
-        
-        
-
-        #   cells_left--;                               sub needs a register instead of an 1nt
-        lw      $t8, cells_left
-        sub     $t8, $t8, 1
-        sw      $t8, cells_left
-
-
 
 
 
@@ -839,6 +836,46 @@ update_highscore__body:
 
         # PUT YOUR CODE FOR update_highscore HERE
 
+        la      $t0, high_score
+        lw      $t1, 0($t0)             # $t1 = high_score.score
+
+        blt     $t1, $a0, update_highscore__branch      # if (high_score.score < score) 
+
+        li      $t0, FALSE
+
+        move    $v0, $t0
+
+        j       update_highscore__epilogue
+
+
+update_highscore__branch:
+        sw      $a0, 0($t0)     # high_score.score = score;
+
+        la      $t0, high_score
+        la      $t1, user_name
+
+        li      $t3, 0          # int t3 = '\0'
+
+update_highscore__loop:
+        lb      $t4, 0($t1)     # $t1 = user_name[i]
+
+        beq     $t3, $t4, update_highscore__loop_end # while (user_name[i] != '\0') {
+
+        sb      $t4, 4($t0)     
+
+        addi     $t1, $t1, 1    # i++
+        addi     $t0, $t0, 1    # i++;
+
+        j       update_highscore__loop
+
+update_highscore__loop_end:
+
+        sb      $t3, 4($t0)     # high_score.name[i] = '\0';
+
+        li      $t0, TRUE
+        move    $v0, $t0
+        j       update_highscore__epilogue
+
 update_highscore__epilogue:
         lw      $ra, 0($sp)
         addiu   $sp, $sp, 4
@@ -891,6 +928,64 @@ print_scores__body:
 
         # PUT YOUR CODE FOR print_scores HERE
 
+        la      $a0, scores_msg         # printf("-------------SCORES-----------\n\n");
+        li      $v0, 4                  #
+        syscall
+
+        li      $t0, 0                  # int i = 0;
+        li      $t3, -1                 # int x = -1
+
+
+print_scores__body__loop:
+
+        bge     $t0, MAX_SCORES, print_scores__body__end # for (int i = 0; i < MAX_SCORES; i++) {
+
+        mul     $t1, $t0, USER_SCORE_SIZE
+        lw      $t2, scores($t1)                #struct UserScore curr = scores[i];
+
+        beq     $t2, $t3, print_scores__body__end # if (curr.score == -1) {break;}
+
+        # print statements
+        la      $a0, scores_line_msg    # printf("------------------------------\n");
+        li      $v0, 4                  #
+        syscall
+
+        la      $a0, scores_username_msg    # printf("* USERNAME:\t%s\n", curr.name);
+        li      $v0, 4                  #
+        syscall
+
+        la      $a0, scores($t1)        #
+        add     $a0, $a0, 4             #
+        li      $v0, 4                  #
+        syscall                         # printf("%s", score[i].name);
+
+        li      $a0, '\n'               #
+        li      $v0, 11                 #
+        syscall                         # printf('\n');
+
+
+        la      $a0, scores_score_msg    # printf("* SCORE:\t%d\n", curr.score);
+        li      $v0, 4                  #
+        syscall
+        
+        move      $a0, $t2        #
+        li      $v0, 1                  #
+        syscall                         # printf("%s", score[i].name);
+        
+        li      $a0, '\n'               #
+        li      $v0, 11                 #
+        syscall                         # printf('\n');
+
+
+        addi    $t0, $t0, 1             # i++;
+
+        j       print_scores__body__loop
+
+
+print_scores__body__end:
+        la      $a0, scores_line_msg    # printf("------------------------------\n");
+        li      $v0, 4                  #
+        syscall
 
 print_scores__epilogue:
         lw      $ra, 0($sp)
