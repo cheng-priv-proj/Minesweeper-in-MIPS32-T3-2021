@@ -605,8 +605,16 @@ clear_surroundings:
         #   -> [epilogue]
 
 clear_surroundings__prologue:
-        addiu   $sp, $sp, -4
+        addiu   $sp, $sp, -20
         sw      $ra, 0($sp)
+        sw      $s0, 4($sp)
+        sw      $s1, 8($sp)
+        sw      $s2, 12($sp)
+        sw      $s3, 16($sp)
+
+
+        move    $s0, $a0
+        move    $s1, $a1
 
 clear_surroundings__body:
 
@@ -642,190 +650,142 @@ clear_surroundings__body:
         #   clear_surroundings(row + 1, col + 1);
         # }
 
-        # if (row < 0 || row >= N_ROWS || col < 0 || col >= N_COLS) {return}
-        
-        bltz    $a0, clear_surroundings__epilogue       # row < 0
-        li      $t0, N_ROWS                             #
-        bge     $a0, $t0, clear_surroundings__epilogue  # row >= N_ROWS
-
-        bltz    $a1, clear_surroundings__epilogue       # col < 0
-        li      $t0, N_COLS                             #
-        bge     $a0, $t0, clear_surroundings__epilogue  # col >= N_COLS
-
-        #<<<<<<<<<<<<<<<<<<<<<
         # getting grid[row][col]
         la      $t0, grid                       # t0 = &grid
         
-        mul     $t1, $a0, N_COLS                # y_array_position( t1 ) = (n_cols * int rows)
-        add     $t2, $a1, $t1                   # x_y_position (t2) = (int col + $t1)
-        add     $t3, $t2, $t0                   # x_y_in_grid ( t3 ) = (grid + t2)
+        mul     $t1, $s0, N_COLS                # y_array_position( t1 ) = (n_cols * int rows)
+        add     $t2, $s1, $t1                   # x_y_position (t2) = (int col + $t1)
+        add     $s3, $t2, $t0                   # x_y_in_grid ( t3 ) = (grid + t2)
                                                 #
-        lb      $t4, 0($t3)                     # $t4 = grid[row][col]
-        #>>>>>>>>>>>>>>>>>>>>>>> added in to test 
+        lb      $s2, 0($s3)                     # $s2 = grid[row][col]
+
+
+
+        # if (row < 0 || row >= N_ROWS || col < 0 || col >= N_COLS) {return}
+        
+        bltz    $s0, clear_surroundings__epilogue       # row < 0
+        li      $t0, N_ROWS                             #
+        bge     $s0, $t0, clear_surroundings__epilogue  # row >= N_ROWS
+
+        bltz    $s1, clear_surroundings__epilogue       # col < 0
+        li      $t0, N_COLS                             #
+        bge     $s1, $t0, clear_surroundings__epilogue  # col >= N_COLS
+
 
         # if (grid[row][col] & IS_RVLD_MASK) {return}
-        andi    $t5, $t4, IS_RVLD_MASK          # 
-        beq     $t5, IS_RVLD_MASK, clear_surroundings__epilogue  #
-
+        andi    $t5, $s2, IS_RVLD_MASK          # 
+        bge     $t5, IS_RVLD_MASK, clear_surroundings__epilogue  #
 
         # grid[row][col] |= IS_RVLD_MASK;
-        ori     $t5, $t4, IS_RVLD_MASK
-        sb      $t5, 0($t3)
+        ori     $t5, $s2, IS_RVLD_MASK
+        sb      $t5, 0($s3)
 
-        #   cells_left--;
-        lw      $t8, cells_left
-        sub     $t8, $t8, 1
-        sw      $t8, cells_left
-
-        
 
         #// Unmark the cell if it was marked.
         #   grid[row][col] &= ~IS_MRKD_MASK;
         li      $t6, IS_MRKD_MASK
         not     $t7, $t6                        # $t7 = ~is_mrkd_mask;
-        and     $t5, $t7, $t4                   #        
+        and     $t5, $t7, $t5                   #        
 
-        sb      $t5, 0($t3)                     # grid[row][col] &= ~IS_MRKD_MASK;
+        sb      $t5, 0($s3)                     # grid[row][col] &= ~IS_MRKD_MASK;
+
+
+        
+        
+
+        #   cells_left--;                               sub needs a register instead of an 1nt
+        lw      $t8, cells_left
+        sub     $t8, $t8, 1
+        sw      $t8, cells_left
+
+
+
 
 
         # // Stop revealing once a numbered cell is reached.
         #   if (grid[row][col] & VALUE_MASK) {
 
-        andi    $t5, $t4, VALUE_MASK                          # 
-        beq     $t5, VALUE_MASK, clear_surroundings__epilogue #
+        andi    $t5, $s2, VALUE_MASK                          #
+        bnez    $t5, clear_surroundings__epilogue #
 
 
-        # // Recurse to the surrounding cells in the grid.
-        #   clear_surroundings(row - 1, col);
+        #       Recurse to the surrounding cells in the grid.
+        #       clear_surroundings(row - 1, col);
 
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi    $a0, $a0, -1   
         jal     clear_surroundings
 
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
-
         # clear_surroundings(row - 1, col - 1)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi     $a0, $a0, -1   
         addi     $a1, $a1, -1
 
         jal     clear_surroundings
 
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
         # clear_surroundings(row - 1, col + 1)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
+
 
         addi     $a0, $a0, -1   
         addi     $a1, $a1, 1
 
         jal     clear_surroundings
 
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
         # clear_surroundings(row, col - 1)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi    $a1, $a1, -1
 
         jal     clear_surroundings
-
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
 
         # clear_surroundings(row, col + 1)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi    $a1, $a1, 1
 
         jal     clear_surroundings
 
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
         # clear_surroundings(row + 1, col - 1)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi    $a0, $a0, 1   
         addi    $a1, $a1, -1
 
         jal     clear_surroundings
 
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
         # clear_surroundings(row + 1, col)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi    $a0, $a0, 1   
 
         jal     clear_surroundings
 
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
         # clear_surroundings(row + 1, col + 1)
-        addi    $sp, $sp, -12   # move stack pointer down to make room for a0,a1,ra
-        sw      $ra, 0($sp)     # save $ra on $stack
-        sw      $a0, 4($sp)     # save a1 and a0 on stack
-        sw      $a1, 8($sp)     #
+        move    $a0, $s0                        # resetting a to their original values
+        move    $a1, $s1
 
         addi    $a0, $a0, 1   
         addi    $a1, $a1, 1
 
         jal     clear_surroundings
-
-        lw      $ra, 0($sp)     # restore $ra on $stack
-        lw      $a0, 4($sp)     # restore a1 and a0 on stack
-        lw      $a1, 8($sp)     #
-        addi    $sp, $sp, 12    # move stack pointer down to make room for a0,a1,ra
-
-
 
 clear_surroundings__epilogue:
         lw      $ra, 0($sp)
-        addiu   $sp, $sp, 4
+        lw      $s0, 4($sp)
+        lw      $s1, 8($sp)
+        lw      $s2, 12($sp)
+        lw      $s3, 16($sp)
+        addiu   $sp, $sp, 20
         jr      $ra
 
 
