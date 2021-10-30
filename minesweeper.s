@@ -7,8 +7,8 @@
 # !!! IMPORTANT !!!
 #
 #
-# This program was written by YOUR-NAME-HERE (z5555555)
-# on INSERT-DATE-HERE
+# This program was written by YOUR-NAME-HERE (z5361529)
+# on 30/08/2021
 #
 # Version 1.0 (08-10-21): Team COMP1521 <cs1521@cse.unsw.edu.au>
 #
@@ -139,17 +139,23 @@ reveal_grid:
         # Arguments: void
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [$t1, $t2, $t3, $t4, $t5]
-        # Clobbers: [$t1, $t2, $t3, $t4, $t5]
+        # Frame:    [$ra]
+        # Uses:     [$t0, $t1, $t2, $t3, $t4, $t5, $t6]
+        # Clobbers: [$t0, $t1, $t2, $t3, $t4, $t5, $t6]
         #
         # Locals:
-        #   - [...]
-        #
+        #       - $t0 = &grid
+        #       - $t4 = grid[row][col]
+        #       - $t5 = int i;
+        #       - $t6 = int j;
+        #       
         # Structure:
         #   reveal_grid
         #   -> [prologue]
         #   -> body
+        #       -> reveal_grid__body_loop_1
+        #       -> reveal_grid__body_loop_2
+        #       -> reveal_grid__body_loop2_end
         #   -> [epilogue]
 
 reveal_grid__prologue:
@@ -157,9 +163,6 @@ reveal_grid__prologue:
         sw      $ra, 0($sp)
 
 reveal_grid__body:
-
-        # TODO: convert this C function to MIPS [subset 0]
-
         # void reveal_grid(void) {
         #   for (int row = 0; row < N_ROWS; row++) {
         #     for (int col = 0; col < N_COLS; col++) {
@@ -213,17 +216,20 @@ place_bombs:
         #   - $a1: int bad_col
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [$s0]
-        # Clobbers: [$a0, $t0, $t1]
+        # Frame:    [$ra, $s0, $a0, $a1] 
+        # Uses:     [$s0, $a0, $a1, $t0]
+        # Clobbers: [$t0]
         #
         # Locals:
-        #   - [...]
+        #       - $s0 = int i;
+        #       - $t0 = total_bombs;
         #
         # Structure:
         #   place_bombs
         #   -> [prologue]
         #   -> body
+        #       -> place_bombs__body_loop
+        #       -> place_bombs__body_end
         #   -> [epilogue]
 
 place_bombs__prologue:
@@ -238,39 +244,37 @@ place_bombs__body:
         #   }
         # }
 
-
         addi    $sp, $sp, -4                    # move stack pointer down to make room for s0
         sw      $s0, 0($sp)                     #
         li      $s0, 0                          # int i = 0;
 
 place_bombs__body_loop:
         lw      $t0, total_bombs                # $t0 = total_bombs;
-        bge     $s0, $t0, place_bombs__body_end # 
+        bge     $s0, $t0, place_bombs__body_end # while (i < total_bombs)
                                                 #
-        addi    $sp, $sp, -8                    # move stack pointer down to make room for a0,a1,ra
-        sw      $a0, 0($sp)                     # save a1 and a0 on stack
-        sw      $a1, 4($sp)                     #
+        addi    $sp, $sp, -8                    # move stack pointer down to make room for a0,a1
+        sw      $a0, 0($sp)                     # save a0 on stack
+        sw      $a1, 4($sp)                     # save a1 on stack
                                                 #
         jal     place_single_bomb               # place_single_bomb(bad_row, bad_col);
                                                 #
-                                                #
-        lw      $a0, 0($sp)                     # restore a1 and a0 on stack
-        lw      $a1, 4($sp)                     #
-        addi    $sp, $sp, 8                     # move stack pointer down to make room for a0,a1,ra
+        lw      $a0, 0($sp)                     # restore a0 on stack
+        lw      $a1, 4($sp)                     # restore a1 on stack
+        addi    $sp, $sp, 8                     # move stack pointer down to make room for a0,a1
                                                 #
         addi    $s0, $s0, 1                     # i++;
                                                 #
-        j       place_bombs__body_loop          #
+        j       place_bombs__body_loop          # goto place_bombs__body_loop
 
 place_bombs__body_end:
-        lw      $s0, 0($sp)                     # Restoring s0
+        lw      $s0, 0($sp)                     # Restoring s0 
         addi    $sp, $sp, 4                     # 
 
 place_bombs__epilogue:
-        lw      $ra, 0($sp)
-        addiu   $sp, $sp, 4
-
-        jr      $ra
+        lw      $ra, 0($sp)                     #
+        addiu   $sp, $sp, 4                     #
+                                                # 
+        jr      $ra                             # return;
 
 
 
@@ -284,17 +288,24 @@ mark_cell:
         #   $a1: int col
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [...]
-        # Clobbers: [...]
+        # Frame:    [$ra]
+        # Uses:     [$t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t9]
+        # Clobbers: [$t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t9]
         #
         # Locals:
-        #   - [...]
+        #       - $t0 = &grid
+        #       - $t1-$t3 are used to get a value from the array.
+        #       - $t4 = grid[row][col]
+        #       - $t5 = $t4 & IS_RVLD_MASK
+        #       - $t7 = ~is_mrkd_mask;
+        #       - $t9 = bomb_count
         #
         # Structure:
         #   mark_cell
         #   -> [prologue]
         #   -> body
+        #       -> mark_cell__body_rvld_branch
+        #       -> mark_cell__body_rvld_branch_2
         #   -> [epilogue]
 
 mark_cell__prologue:
@@ -321,24 +332,24 @@ mark_cell__body:
         #   }
         # }
 
-        la      $t0, grid                       # t0 = &grid
+        la      $t0, grid                       # $t0 = &grid
                                                 #
         mul     $t1, $a0, N_COLS                #
         add     $t2, $a1, $t1                   # 
         add     $t3, $t2, $t0                   # 
         lb      $t4, 0($t3)                     # $t4 = grid[row][col]
                                                 #
-        andi    $t5, $t4, IS_RVLD_MASK          # 
-        beq     $t5, IS_RVLD_MASK, mark_cell__body_rvld_branch  # if (grid[row][col] & IS_RVLD_MASK) 
+        andi    $t5, $t4, IS_RVLD_MASK          # $t5 = $t4 & IS_RVLD_MASK
+        beq     $t5, IS_RVLD_MASK, mark_cell__body_rvld_branch          # if (grid[row][col] & IS_RVLD_MASK) 
                                                 #
         andi    $t6, $t4, IS_MRKD_MASK          # 
         beq     $t6, IS_MRKD_MASK, mark_cell__body_rvld_branch_2        # if (grid[row][col] & IS_MRKD_MASK) 
                                                 #
-                                                # else 
+                                                #  
         ori     $t4, $t4, IS_MRKD_MASK          # 
         sb      $t4, 0($t3)                     # grid[row][col] |= IS_MRKD_MASK;
                                                 #
-        lw      $t9, bomb_count                 #
+        lw      $t9, bomb_count                 # $t9 = bomb_count
         sub     $t9, $t9, 1                     #
         sw      $t9, bomb_count                 # bomb_count--;
                                                 #
@@ -353,10 +364,10 @@ mark_cell__body_rvld_branch:
         li      $v0, 4                          #
         syscall                                 # printf("Cannot mark a revealed cell.\n");
                                                 #
-        j       mark_cell__epilogue             #
+        j       mark_cell__epilogue             # goto mark_cell__epilogue
 
 mark_cell__body_rvld_branch_2:
-        li      $t6, IS_MRKD_MASK               #
+        li      $t6, IS_MRKD_MASK               # 
         not     $t7, $t6                        # $t7 = ~is_mrkd_mask;
         and     $t4, $t7, $t4                   #        
         sb      $t4, 0($t3)                     # grid[row][col] &= ~IS_MRKD_MASK;
@@ -368,10 +379,10 @@ mark_cell__body_rvld_branch_2:
         j       mark_cell__epilogue             # goto mark_cell_epilogue
 
 mark_cell__epilogue:
-        lw      $ra, 0($sp)
-        addiu   $sp, $sp, 4
-
-        jr      $ra
+        lw      $ra, 0($sp)                     #
+        addiu   $sp, $sp, 4                     #
+                                                #
+        jr      $ra                             # return;
 
 
 
@@ -385,17 +396,27 @@ reveal_cell:
         #   $a1: int col
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [...]
-        # Clobbers: [...]
+        # Frame:    $ra
+        # Uses:     [$a0, $a1, $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8]
+        # Clobbers: [$a0, $a1, $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8]
         #
         # Locals:
-        #   - [...]
+        #       - $t0 = &grid
+        #       - $t1-$t3 are used to get a value from the array.
+        #       - $t4 = grid[row][col]
+        #       - $t8 = cells_left
         #
         # Structure:
         #   reveal_cell
         #   -> [prologue]
         #   -> body
+        #       -> reveal_cell__body_if_1
+        #       -> reveal_cell__body_if_2
+        #       -> reveal_cell__body_if_3
+        #       -> reveal_cell__body_if_4
+        #   -> reveal_cell__body_end
+        #       -> reveal_cell__body_end_2
+        #   -> reveal_cell__body_end_3
         #   -> [epilogue]
 
 reveal_cell__prologue:
@@ -470,20 +491,20 @@ reveal_cell__body_if_2:
         li      $t1, TRUE                       #
         beq     $t1, $t0, reveal_cell__epilogue # if (debug_mode) {return}
                                                 #
-        la      $a0, reveal_error               # printf("Cannot reveal a marked cell.\n");
+        la      $a0, reveal_error               # 
         li      $v0, 4                          #
-        syscall                                 #
+        syscall                                 # printf("Cannot reveal a marked cell.\n");
                                                 #
-        j       reveal_cell__epilogue           #
+        j       reveal_cell__epilogue           # goto reveal_cell__epilogue
 
 reveal_cell__body_if_3:                 
         lw      $t0, debug_mode                 #
         li      $t1, TRUE                       #
         beq     $t1, $t0, reveal_cell__epilogue # if (grid[row][col] & IS_RVLD_MASK) 
                                                 #
-        la      $a0, already_revealed           # printf("Cell is already revealed.\n");
+        la      $a0, already_revealed           # 
         li      $v0, 4                          #
-        syscall                                 #
+        syscall                                 # printf("Cell is already revealed.\n");
                                                 #
         j       reveal_cell__epilogue           # goto reveal_cell__epilogue
 
@@ -502,9 +523,9 @@ reveal_cell__body_end:
         lw      $t7, game_state                 # if (game_state == LOSE) 
         beq     $t7, LOSE, reveal_cell__body_end_2
                                                 #
-        lw      $t8, cells_left                 # cells_left--;
+        lw      $t8, cells_left                 # $t8 = cells_left;
         sub     $t8, $t8, 1                     #
-        sw      $t8, cells_left                 #
+        sw      $t8, cells_left                 # cells_left--;
                                                 #
         j       reveal_cell__body_end_2         # goto reveal_cell__body_end_2
 
@@ -522,7 +543,7 @@ reveal_cell__epilogue:
         lw      $ra, 0($sp)                     #
         addiu   $sp, $sp, 4                     #
                                                 #
-        jr      $ra                             #
+        jr      $ra                             # return;
 
 
 ########################################################################
@@ -535,12 +556,16 @@ clear_surroundings:
         #   $a1: int col
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [...]
-        # Clobbers: [...]
+        # Frame:    [$ra, $s0, $s1, $s2, $s3]
+        # Uses:     [$s0, $a0, $a1, $s1, $s2, $s3, $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8]
+        # Clobbers: [$t0, $a0, $a1, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8]
         #
         # Locals:
-        #   - [...]
+        #       - $s0 = row;
+        #       - $s1 = col;
+        #       - $s2 = grid[row][col]
+        #       - $s3 = address of a specific array index
+        #       - t0 = &grid
         #
         # Structure:
         #   clear_surroundings
@@ -549,11 +574,11 @@ clear_surroundings:
         #   -> [epilogue]
 
 clear_surroundings__prologue:
-        addiu   $sp, $sp, -20
-        sw      $ra, 0($sp)
-        sw      $s0, 4($sp)
-        sw      $s1, 8($sp)
-        sw      $s2, 12($sp)
+        addiu   $sp, $sp, -20                   # Moving stack pointer for 20 bytes
+        sw      $ra, 0($sp)                     #
+        sw      $s0, 4($sp)                     #
+        sw      $s1, 8($sp)                     #
+        sw      $s2, 12($sp)                    #
         sw      $s3, 16($sp)                    # saving $s0, $s1, $s2, $s3 to the stack
                                                 #
         move    $s0, $a0                        # $s0 = row;
@@ -614,87 +639,86 @@ clear_surroundings__body:
         li      $t0, 1                          #
         sub     $t8, $t8, $t0                   #
         sw      $t8, cells_left                 # cells_left--;
-        
+                                                #
         #// Unmark the cell if it was marked.   #
         li      $t6, IS_MRKD_MASK               #
         not     $t7, $t6                        # $t7 = ~is_mrkd_mask;
         and     $t5, $t7, $t5                   #        
         sb      $t5, 0($s3)                     # grid[row][col] &= ~IS_MRKD_MASK;
-
+                                                #
         # // Stop revealing once a numbered cell is reached.
         andi    $t5, $s2, VALUE_MASK            #
         bnez    $t5, clear_surroundings__epilogue       # if (grid[row][col] & VALUE_MASK) {
                                                 #
-
+                                                #
         #       Recurse to the surrounding cells in the grid.
-
-        move    $a0, $s0                        # resetting a to their original values
-        move    $a1, $s1
-
-        addi    $a0, $a0, -1   
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi    $a0, $a0, -1                    # row --;
         jal     clear_surroundings              # clear_surroundings(row - 1, col);
-
-        move    $a0, $s0                        
-        move    $a1, $s1
-
-        addi     $a0, $a0, -1   
-        addi     $a1, $a1, -1
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi     $a0, $a0, -1                   # row --;
+        addi     $a1, $a1, -1                   # col --;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row - 1, col - 1)
-
-        move    $a0, $s0                        
-        move    $a1, $s1
-
-        addi     $a0, $a0, -1   
-        addi     $a1, $a1, 1
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi     $a0, $a0, -1                   # row--;
+        addi     $a1, $a1, 1                    # col++;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row - 1, col + 1)
-
-        move    $a0, $s0                        
-        move    $a1, $s1
-
-        addi    $a1, $a1, -1
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi    $a1, $a1, -1                    # col--;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row, col - 1)
-
-        move    $a0, $s0                        
-        move    $a1, $s1
-
-        addi    $a1, $a1, 1
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi    $a1, $a1, 1                     # col++;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row, col + 1)
-
-        move    $a0, $s0                        
-        move    $a1, $s1
-
-        addi    $a0, $a0, 1   
-        addi    $a1, $a1, -1
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi    $a0, $a0, 1                     # row++;
+        addi    $a1, $a1, -1                    # col--;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row + 1, col - 1)
-
-        move    $a0, $s0                        #
-        move    $a1, $s1
-
-        addi    $a0, $a0, 1   
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi    $a0, $a0, 1                     # row++;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row + 1, col)
-
-        move    $a0, $s0                        # resetting a to their original values
-        move    $a1, $s1
-
-        addi    $a0, $a0, 1   
-        addi    $a1, $a1, 1
-
+                                                #
+        move    $a0, $s0                        # restoring $a0 and $a1
+        move    $a1, $s1                        #
+                                                #
+        addi    $a0, $a0, 1                     # row++;
+        addi    $a1, $a1, 1                     # col++;
+                                                #
         jal     clear_surroundings              # clear_surroundings(row + 1, col + 1)
 
 clear_surroundings__epilogue:
-        lw      $ra, 0($sp)
-        lw      $s0, 4($sp)
-        lw      $s1, 8($sp)
-        lw      $s2, 12($sp)
-        lw      $s3, 16($sp)
-        addiu   $sp, $sp, 20
-        jr      $ra
+        lw      $ra, 0($sp)                     # 
+        lw      $s0, 4($sp)                     #
+        lw      $s1, 8($sp)                     #
+        lw      $s2, 12($sp)                    #
+        lw      $s3, 16($sp)                    #
+        addiu   $sp, $sp, 20                    #
+        jr      $ra                             # return;
 
 
 
@@ -707,17 +731,23 @@ update_highscore:
         #   $a0: int score
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [...]
-        # Clobbers: [...]
+        # Frame:    [$ra]
+        # Uses:     [$a0, $t0, $t1, $t2, $t3, $t4]
+        # Clobbers: [$a0, $t0, $t1, $t2, $t3, $t4]
         #
         # Locals:
-        #   - [...]
+        #       - $t0 = &high_score
+        #       - $t1 = high_score.score
+        #       - $t3 = '\0'
+        #       - $t4 = user_name[i]
         #
         # Structure:
         #   update_highscore
         #   -> [prologue]
         #   -> body
+        #       -> update_highscore__branch
+        #       -> update_highscore__loop
+        #       -> update_highscore__loop_end
         #   -> [epilogue]
 
 update_highscore__prologue:
@@ -725,9 +755,6 @@ update_highscore__prologue:
         sw      $ra, 0($sp)
 
 update_highscore__body:
-
-        # TODO: convert this C function to MIPS
-
         # int update_highscore(int score) {
         #   if (high_score.score < score) {
         #     high_score.score = score;
@@ -745,53 +772,49 @@ update_highscore__body:
         #   return FALSE;
         # }
 
-        # PUT YOUR CODE FOR update_highscore HERE
-
-        la      $t0, high_score
-        lw      $t1, 0($t0)             # $t1 = high_score.score
-
+        la      $t0, high_score                 # $t0 = &high_score
+        lw      $t1, 0($t0)                     # $t1 = high_score.score
+                                                #
         blt     $t1, $a0, update_highscore__branch      # if (high_score.score < score) 
-
-        li      $t0, FALSE
-
-        move    $v0, $t0
-
-        j       update_highscore__epilogue
-
+                                                #
+        li      $t0, FALSE                      # 
+        move    $v0, $t0                        # return FALSE;
+                                                #
+        j       update_highscore__epilogue      # goto update_highscore__epilogue
 
 update_highscore__branch:
-        sw      $a0, 0($t0)     # high_score.score = score;
-
-        la      $t0, high_score
-        la      $t1, user_name
-
-        li      $t3, 0          # int t3 = '\0'
+        sw      $a0, 0($t0)                     # high_score.score = score;
+                                                #
+        la      $t0, high_score                 #
+        la      $t1, user_name                  #
+                                                #
+        li      $t3, 0                          # $t3 = '\0'
 
 update_highscore__loop:
-        lb      $t4, 0($t1)     # $t1 = user_name[i]
-
+        lb      $t4, 0($t1)                     # $t1 = user_name[i]
+                                                #
         beq     $t3, $t4, update_highscore__loop_end # while (user_name[i] != '\0') {
-
-        sb      $t4, 4($t0)     
-
-        addi     $t1, $t1, 1    # i++
-        addi     $t0, $t0, 1    # i++;
-
-        j       update_highscore__loop
+                                                #
+        sb      $t4, 4($t0)                     # high_score.name[i] = user_name[i];
+                                                #
+        addi     $t1, $t1, 1                    # i++
+        addi     $t0, $t0, 1                    # i++;
+                                                #
+        j       update_highscore__loop          # goto update_highscore__loop
 
 update_highscore__loop_end:
-
-        sb      $t3, 4($t0)     # high_score.name[i] = '\0';
-
-        li      $t0, TRUE
-        move    $v0, $t0
-        j       update_highscore__epilogue
+        sb      $t3, 4($t0)                     # high_score.name[i] = '\0';
+                                                #
+        li      $t0, TRUE                       #
+        move    $v0, $t0                        # return TRUE;
+                                                #
+        j       update_highscore__epilogue      # goto update_highscore__epilogue
 
 update_highscore__epilogue:
-        lw      $ra, 0($sp)
-        addiu   $sp, $sp, 4
-
-        jr      $ra
+        lw      $ra, 0($sp)                     # Restoring stack pointer
+        addiu   $sp, $sp, 4                     #
+                                                #
+        jr      $ra                             # return;
 
 
 
@@ -802,17 +825,21 @@ print_scores:
         # Arguments: void
         # Returns: void
         #
-        # Frame:    $ra, [...]
-        # Uses:     [...]
+        # Frame:    [$ra]
+        # Uses:     [$t0, $t1, $t2, $t3, ]
         # Clobbers: [...]
         #
         # Locals:
-        #   - [...]
+        #       - $t0 = int i;
+        #       - $t2 = struct UserScore curr
+        #       - $t3 = -1; 
         #
         # Structure:
         #   print_scores
         #   -> [prologue]
         #   -> body
+        #       -> print_scores__body__loop
+        #   -> print_scores__body__end
         #   -> [epilogue]
 
 print_scores__prologue:
@@ -820,9 +847,6 @@ print_scores__prologue:
         sw      $ra, 0($sp)
 
 print_scores__body:
-
-        # TODO: convert this C function to MIPS
-
         # void print_scores(void) {
         #   printf("-------------SCORES-----------\n\n");
         #   for (int i = 0; i < MAX_SCORES; i++) {
@@ -837,72 +861,64 @@ print_scores__body:
         #   printf("------------------------------\n");
         # }
 
-        # PUT YOUR CODE FOR print_scores HERE
-
-        la      $a0, scores_msg         # printf("-------------SCORES-----------\n\n");
-        li      $v0, 4                  #
-        syscall
-
-        li      $t0, 0                  # int i = 0;
-        li      $t3, -1                 # int x = -1
-
+        la      $a0, scores_msg                 #
+        li      $v0, 4                          #
+        syscall                                 # printf("-------------SCORES-----------\n\n");
+                                                #
+        li      $t0, 0                          # int i = 0;
+        li      $t3, -1                         # int x = -1
 
 print_scores__body__loop:
-
         bge     $t0, MAX_SCORES, print_scores__body__end # for (int i = 0; i < MAX_SCORES; i++) {
-
-        mul     $t1, $t0, USER_SCORE_SIZE
-        lw      $t2, scores($t1)                #struct UserScore curr = scores[i];
-
+                                                #
+        mul     $t1, $t0, USER_SCORE_SIZE       #
+        lw      $t2, scores($t1)                # struct UserScore curr = scores[i];
+                                                #
         beq     $t2, $t3, print_scores__body__end # if (curr.score == -1) {break;}
-
-        # print statements
-        la      $a0, scores_line_msg    # printf("------------------------------\n");
-        li      $v0, 4                  #
-        syscall
-
-        la      $a0, scores_username_msg    # printf("* USERNAME:\t%s\n", curr.name);
-        li      $v0, 4                  #
-        syscall
-
-        la      $a0, scores($t1)        #
-        add     $a0, $a0, 4             #
-        li      $v0, 4                  #
-        syscall                         # printf("%s", score[i].name);
-
-        li      $a0, '\n'               #
-        li      $v0, 11                 #
-        syscall                         # printf('\n');
-
-
-        la      $a0, scores_score_msg    # printf("* SCORE:\t%d\n", curr.score);
-        li      $v0, 4                  #
-        syscall
-        
-        move      $a0, $t2        #
-        li      $v0, 1                  #
-        syscall                         # printf("%s", score[i].name);
-        
-        li      $a0, '\n'               #
-        li      $v0, 11                 #
-        syscall                         # printf('\n');
-
-
-        addi    $t0, $t0, 1             # i++;
-
-        j       print_scores__body__loop
-
+                                                #
+        la      $a0, scores_line_msg            # 
+        li      $v0, 4                          #
+        syscall                                 # printf("------------------------------\n");
+                                                #
+        la      $a0, scores_username_msg        #
+        li      $v0, 4                          #
+        syscall                                 # printf("* USERNAME:\t%s\n", curr.name);
+                                                #
+        la      $a0, scores($t1)                #
+        add     $a0, $a0, 4                     #
+        li      $v0, 4                          #
+        syscall                                 # printf("%s", score[i].name);
+                                                #
+        li      $a0, '\n'                       #
+        li      $v0, 11                         #
+        syscall                                 # printf('\n');
+                                                #
+        la      $a0, scores_score_msg           # 
+        li      $v0, 4                          #
+        syscall                                 # printf("* SCORE:\t%d\n", curr.score);
+                                                #
+        move      $a0, $t2                      #
+        li      $v0, 1                          #
+        syscall                                 # printf("%s", score[i].name);
+                                                #
+        li      $a0, '\n'                       #
+        li      $v0, 11                         #
+        syscall                                 # printf('\n');
+                                                #
+        addi    $t0, $t0, 1                     # i++;
+                                                #
+        j       print_scores__body__loop        # goto print_scores__body__loop
 
 print_scores__body__end:
-        la      $a0, scores_line_msg    # printf("------------------------------\n");
-        li      $v0, 4                  #
-        syscall
+        la      $a0, scores_line_msg            # 
+        li      $v0, 4                          #
+        syscall                                 # printf("------------------------------\n");
 
 print_scores__epilogue:
-        lw      $ra, 0($sp)
-        addiu   $sp, $sp, 4
-
-        jr      $ra
+        lw      $ra, 0($sp)                     #
+        addiu   $sp, $sp, 4                     #
+                                                #
+        jr      $ra                             # return;
 
 
 
