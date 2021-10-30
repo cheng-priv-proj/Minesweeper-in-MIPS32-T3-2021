@@ -396,7 +396,7 @@ reveal_cell:
         #   $a1: int col
         # Returns: void
         #
-        # Frame:    $ra
+        # Frame:    [$ra]
         # Uses:     [$a0, $a1, $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8]
         # Clobbers: [$a0, $a1, $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8]
         #
@@ -826,8 +826,8 @@ print_scores:
         # Returns: void
         #
         # Frame:    [$ra]
-        # Uses:     [$t0, $t1, $t2, $t3, ]
-        # Clobbers: [...]
+        # Uses:     [$t0, $t1, $t2, $t3]
+        # Clobbers: [$t0, $t1, $t2, $t3]
         #
         # Locals:
         #       - $t0 = int i;
